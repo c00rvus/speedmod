@@ -1,0 +1,69 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speed Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1 id="titleHeading">Settings</h1>
+    <form id="settingsForm">
+      <section>
+        <h2 id="valuesHeading">Default values</h2>
+        <label class="field" id="labelDefaultSpeed">
+          <span>Default speed</span>
+          <input type="number" id="defaultSpeed" min="0.1" max="16" step="0.05" required>
+        </label>
+        <label class="field" id="labelSpeedStep">
+          <span>Shortcut increment</span>
+          <input type="number" id="speedStep" min="0.05" max="4" step="0.05" required>
+        </label>
+        <div class="row">
+          <label class="field" id="labelMinSpeed">
+            <span>Minimum value</span>
+            <input type="number" id="minSpeed" min="0.05" max="16" step="0.05" required>
+          </label>
+          <label class="field" id="labelMaxSpeed">
+            <span>Maximum value</span>
+            <input type="number" id="maxSpeed" min="0.1" max="16" step="0.05" required>
+          </label>
+        </div>
+        <label class="field" id="labelLanguage">
+          <span>Language</span>
+          <select id="language">
+            <option value="en">English</option>
+            <option value="pt-BR">Português (Brasil)</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2 id="behaviorHeading">Behavior</h2>
+        <label class="checkbox" id="labelApplyOnLoad">
+          <input type="checkbox" id="applyOnLoad">
+          <span>Apply default speed automatically</span>
+        </label>
+        <label class="checkbox" id="labelRememberLastSpeed">
+          <input type="checkbox" id="rememberLastSpeed">
+          <span>Remember speed per tab during the session</span>
+        </label>
+      </section>
+
+      <div class="actions">
+        <button type="submit" id="saveButton">Save</button>
+        <button type="button" id="restoreDefaults">Restore defaults</button>
+      </div>
+      <p id="saveStatus" role="status" aria-live="polite"></p>
+    </form>
+
+    <section class="help">
+      <h2 id="helpHeading">Keyboard shortcuts</h2>
+      <p id="helpText">During playback, use the keys <strong>A</strong> (decrease), <strong>S</strong> (default) and <strong>D</strong> (increase). The popup offers the same controls.</p>
+    </section>
+  </main>
+  <script src="options.js" defer></script>
+</body>
+</html>
+

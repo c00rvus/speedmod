@@ -1,0 +1,23 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speed Control – Privacy Policy</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; max-width: 720px; }
+    h1 { font-size: 1.8rem; }
+  </style>
+</head>
+<body>
+  <h1>Speed Control – Privacy Policy</h1>
+  <p><strong>Effective date:</strong> <span id="date"></span></p>
+  <p>Speed Control does not collect, store, or transmit any personal data. All extension logic runs locally within your browser.</p>
+  <p>The settings you configure (default playback speed, step size, minimum and maximum limits, whether to auto-apply speeds, and language preference) are saved using the <code>chrome.storage</code> API on your own device. These values never leave your browser and are only used to provide the features of the extension.</p>
+  <p>The extension does not send data to external servers, does not use analytics, and does not share information with third parties.</p>
+  <p>If you have questions about this privacy statement, please contact <a href="mailto:contact@speedcontrol.app">contact@speedcontrol.app</a>.</p>
+  <script>
+    document.getElementById('date').textContent = new Date().toISOString().slice(0, 10);
+  </script>
+</body>
+</html>
