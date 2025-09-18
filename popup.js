@@ -254,6 +254,11 @@ async function bootstrap() {
     return;
   }
 
+  // Set the active tab this popup controls to receive updates
+  // and send commands without requiring the tabs permission.
+  const maybeTabId = Number(response.tabId);
+  activeTabId = Number.isFinite(maybeTabId) ? maybeTabId : null;
+
   settings = { ...DEFAULT_SETTINGS, ...response.settings };
   applyTranslations(settings.language || 'en');
   updateBounds(settings);

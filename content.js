@@ -512,6 +512,29 @@ function init() {
   loadSettings();
   notifyFrameStatus();
   window.addEventListener('keydown', handleKeyboard, true);
+
+  // Inform the background which tab is active without needing the
+  // tabs permission. Send when visible now and on visibility changes.
+  if (document.visibilityState === 'visible') {
+    safeSendMessage({ type: 'TAB_FOCUSED' });
+  }
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.visibilityState === 'visible') {
+        safeSendMessage({ type: 'TAB_FOCUSED' });
+      }
+    },
+    true
+  );
+  // Clean up tracking when the page is being hidden/unloaded.
+  window.addEventListener(
+    'pagehide',
+    () => {
+      safeSendMessage({ type: 'TAB_UNLOADED' });
+    },
+    { once: true }
+  );
 }
 
 if (document.readyState === 'loading') {

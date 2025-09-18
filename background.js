@@ -289,6 +289,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'CONTENT_SPEED_CHANGE') {
     if (tabId !== undefined) {
+      // Treat activity from a tab as a signal that it is the
+      // current target for the popup, avoiding the need for
+      // the tabs permission.
+      lastFocusedTabId = tabId;
       if (settingsCache.rememberLastSpeed && message.applied) {
         tabSpeeds.set(tabId, message.speed);
       } else if (!settingsCache.rememberLastSpeed) {
@@ -415,4 +419,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
-
