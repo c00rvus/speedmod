@@ -296,28 +296,45 @@ async function setSpeed(speed) {
 }
 
 async function bootstrap() {
+  // 1) Try cached state for instant paint
+  const cached = await sendCommandToBackground('POPUP_GET_CACHED_STATE', {});
+  if (cached) {
+    if (Number.isFinite(cached.tabId)) {
+      activeTabId = cached.tabId;
+    }
+    settings = { ...DEFAULT_SETTINGS, ...cached.settings };
+    applyTranslations(settings.language || 'en');
+    updateBounds(settings);
+    renderSpeed(Number(cached.speed) || settings.defaultSpeed);
+    setControlsDisabled(false);
+    if (!cached.hasPlaying) {
+      showStatus(strings.status.playPrompt, 'info');
+    } else {
+      showStatus('');
+    }
+  }
+
+  // 2) Fetch authoritative state from content script
   const response = await sendCommandToBackground('POPUP_GET_STATE', {});
-  if (!response) {
-    setControlsDisabled(true);
-    showStatus(strings.status.siteUnsupported, 'error');
+  if (response) {
+    const maybeTabId = Number(response.tabId);
+    activeTabId = Number.isFinite(maybeTabId) ? maybeTabId : activeTabId;
+    settings = { ...DEFAULT_SETTINGS, ...response.settings };
+    applyTranslations(settings.language || 'en');
+    updateBounds(settings);
+    renderSpeed(Number(response.speed) || settings.defaultSpeed);
+    setControlsDisabled(false);
+    if (!response.hasPlaying) {
+      showStatus(strings.status.playPrompt, 'info');
+    } else {
+      showStatus('');
+    }
     return;
   }
 
-  // Set the active tab this popup controls to receive updates
-  // and send commands without requiring the tabs permission.
-  const maybeTabId = Number(response.tabId);
-  activeTabId = Number.isFinite(maybeTabId) ? maybeTabId : null;
-
-  settings = { ...DEFAULT_SETTINGS, ...response.settings };
-  applyTranslations(settings.language || 'en');
-  updateBounds(settings);
-  renderSpeed(response.speed || settings.defaultSpeed);
-  setControlsDisabled(false);
-
-  if (!response.hasPlaying) {
-    showStatus(strings.status.playPrompt, 'info');
-  } else {
-    showStatus('');
+  if (!cached) {
+    setControlsDisabled(true);
+    showStatus(strings.status.siteUnsupported, 'error');
   }
 }
 

@@ -372,6 +372,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
 
+  if (message.type === 'POPUP_GET_CACHED_STATE') {
+    let targetTabId = Number(message.tabId);
+    if (!Number.isFinite(targetTabId)) {
+      targetTabId = lastFocusedTabId;
+    }
+    if (!Number.isFinite(targetTabId)) {
+      sendResponse(null);
+      return;
+    }
+
+    const registry = frameRegistry.get(targetTabId);
+    if (registry) {
+      for (const info of registry.values()) {
+        if (info.lastSpeed !== undefined) {
+          sendResponse({
+            tabId: targetTabId,
+            speed: info.lastSpeed,
+            enforce: settingsCache.applyOnLoad,
+            settings: { ...settingsCache },
+            hasPlaying: Boolean(info.hasPlaying),
+            hasMedia: Boolean(info.hasMedia)
+          });
+          return;
+        }
+      }
+    }
+
+    const stored = tabSpeeds.get(targetTabId);
+    if (typeof stored === 'number') {
+      sendResponse({
+        tabId: targetTabId,
+        speed: stored,
+        enforce: settingsCache.applyOnLoad,
+        settings: { ...settingsCache },
+        hasPlaying: false,
+        hasMedia: Boolean(registry && registry.size > 0)
+      });
+      return;
+    }
+
+    sendResponse(null);
+    return;
+  }
+
   if (message.type === 'POPUP_GET_STATE') {
     let targetTabId = Number(message.tabId);
     if (!Number.isFinite(targetTabId)) {
