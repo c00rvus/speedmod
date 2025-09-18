@@ -16,17 +16,18 @@ let lastFocusedTabId = null;
 function toBadgeText(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '';
-  const rounded = Math.round(n * 100) / 100;
-  let text = String(rounded.toFixed(2)).replace(/\.0+$/, '').replace(/(\.\d)0$/, '$1');
-  if (text.length > 4) text = text.slice(0, 4);
-  return text;
+  // Always keep 2 decimals to keep badge width stable
+  return n.toFixed(2);
 }
 
 function setBadge(tabId, speed, applied = true) {
   const text = toBadgeText(speed);
   try {
-    chrome.action.setBadgeText({ tabId, text });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: applied ? '#0ea5e9' : '#9ca3af' });
+    chrome.action.setBadgeText({ tabId, text }, () => { void chrome.runtime?.lastError; });
+    chrome.action.setBadgeBackgroundColor(
+      { tabId, color: applied ? '#0ea5e9' : '#9ca3af' },
+      () => { void chrome.runtime?.lastError; }
+    );
   } catch (e) {
     // ignore
   }
@@ -34,7 +35,7 @@ function setBadge(tabId, speed, applied = true) {
 
 function clearBadge(tabId) {
   try {
-    chrome.action.setBadgeText({ tabId, text: '' });
+    chrome.action.setBadgeText({ tabId, text: '' }, () => { void chrome.runtime?.lastError; });
   } catch (e) {
     // ignore
   }
