@@ -13,6 +13,33 @@ const settingsCache = { ...DEFAULT_SETTINGS };
 const frameRegistry = new Map();
 let lastFocusedTabId = null;
 
+function toBadgeText(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  const rounded = Math.round(n * 100) / 100;
+  let text = String(rounded.toFixed(2)).replace(/\.0+$/, '').replace(/(\.\d)0$/, '$1');
+  if (text.length > 4) text = text.slice(0, 4);
+  return text;
+}
+
+function setBadge(tabId, speed, applied = true) {
+  const text = toBadgeText(speed);
+  try {
+    chrome.action.setBadgeText({ tabId, text });
+    chrome.action.setBadgeBackgroundColor({ tabId, color: applied ? '#0ea5e9' : '#9ca3af' });
+  } catch (e) {
+    // ignore
+  }
+}
+
+function clearBadge(tabId) {
+  try {
+    chrome.action.setBadgeText({ tabId, text: '' });
+  } catch (e) {
+    // ignore
+  }
+}
+
 function loadInitialSettings() {
   chrome.storage.sync.get(DEFAULT_SETTINGS, (items) => {
     Object.assign(settingsCache, items);
@@ -253,6 +280,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'TAB_FOCUSED') {
     if (tabId !== undefined) {
       lastFocusedTabId = tabId;
+      const registry = frameRegistry.get(tabId);
+      let shown = false;
+      if (registry) {
+        for (const info of registry.values()) {
+          if (typeof info.lastSpeed === 'number') {
+            setBadge(tabId, info.lastSpeed, Boolean(info.hasPlaying));
+            shown = true;
+            break;
+          }
+        }
+      }
+      if (!shown) {
+        const stored = tabSpeeds.get(tabId);
+        if (typeof stored === 'number') {
+          setBadge(tabId, stored, false);
+        } else {
+          dispatchMessageToFrames(tabId, { type: 'GET_STATE' })
+            .then(({ response }) => {
+              if (response && typeof response.speed === 'number') {
+                setBadge(tabId, response.speed, Boolean(response.hasPlaying));
+              }
+            })
+            .catch(() => {});
+        }
+      }
     }
     return;
   }
@@ -264,6 +316,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (lastFocusedTabId === tabId) {
         lastFocusedTabId = null;
       }
+      clearBadge(tabId);
     }
     return;
   }
@@ -275,6 +328,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         hasPlaying: Boolean(message.hasPlaying),
         lastSpeed: typeof message.speed === 'number' ? message.speed : undefined
       });
+      if (typeof message.speed === 'number') {
+        setBadge(tabId, message.speed, Boolean(message.hasPlaying));
+      }
       broadcast({
         type: 'FRAME_STATUS',
         tabId,
@@ -303,6 +359,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         hasPlaying: Boolean(message.applied),
         lastSpeed: message.speed
       });
+      setBadge(tabId, message.speed, Boolean(message.applied));
       broadcast({
         type: 'SPEED_UPDATE',
         tabId,
@@ -328,6 +385,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(({ response }) => {
         if (response) {
           sendResponse({ ...response, tabId: targetTabId });
+          if (typeof response.speed === 'number') {
+            setBadge(targetTabId, response.speed, Boolean(response.hasPlaying));
+          }
           return;
         }
 
@@ -358,6 +418,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             hasPlaying: false,
             hasMedia: Boolean(registry && registry.size > 0)
           });
+          setBadge(targetTabId, stored, false);
           return;
         }
 
@@ -369,6 +430,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           hasPlaying: false,
           hasMedia: Boolean(registry && registry.size > 0)
         });
+        setBadge(targetTabId, settingsCache.defaultSpeed, false);
       })
       .catch(() => sendResponse(null));
     return true;
@@ -390,6 +452,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             speed: response.speed,
             applied: response.applied
           });
+          setBadge(targetTabId, response.speed, Boolean(response.applied));
         }
         sendResponse(response || null);
       })
@@ -412,6 +475,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             speed: response.speed,
             applied: response.applied
           });
+          setBadge(targetTabId, response.speed, Boolean(response.applied));
         }
         sendResponse(response || null);
       })
