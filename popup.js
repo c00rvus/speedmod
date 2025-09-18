@@ -21,7 +21,7 @@ const TRANSLATIONS = {
       decreaseTitle: 'Decrease speed',
       increaseTitle: 'Increase speed',
       resetTitle: 'Restore default speed',
-      resetButton: 'Default',
+      resetButton: 'Default (S)',
       hint: 'Start playback to change the speed. Use A, S and D directly on the video.',
       sliderLabel: 'Speed'
     },
@@ -246,26 +246,8 @@ async function setSpeed(speed) {
   handleSpeedResponse(response);
 }
 
-function getActiveTabId() {
-  return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs && tabs[0];
-      resolve(tab && tab.id !== undefined ? tab.id : null);
-    });
-  });
-}
-
 async function bootstrap() {
-  activeTabId = await getActiveTabId();
-  if (activeTabId === null) {
-    setControlsDisabled(true);
-    showStatus(strings.status.tabUnavailable, 'error');
-    return;
-  }
-
-  const response = await sendCommandToBackground('POPUP_GET_STATE', {
-    tabId: activeTabId
-  });
+  const response = await sendCommandToBackground('POPUP_GET_STATE', {});
   if (!response) {
     setControlsDisabled(true);
     showStatus(strings.status.siteUnsupported, 'error');
@@ -287,6 +269,7 @@ async function bootstrap() {
 
 applyTranslations(DEFAULT_SETTINGS.language);
 bootstrap();
+
 
 
 

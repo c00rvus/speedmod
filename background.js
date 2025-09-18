@@ -11,6 +11,7 @@
 const tabSpeeds = new Map();
 const settingsCache = { ...DEFAULT_SETTINGS };
 const frameRegistry = new Map();
+let lastFocusedTabId = null;
 
 function loadInitialSettings() {
   chrome.storage.sync.get(DEFAULT_SETTINGS, (items) => {
@@ -249,6 +250,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab && sender.tab.id;
   const frameId = sender.frameId !== undefined ? sender.frameId : 0;
 
+  if (message.type === 'TAB_FOCUSED') {
+    if (tabId !== undefined) {
+      lastFocusedTabId = tabId;
+    }
+    return;
+  }
+
+  if (message.type === 'TAB_UNLOADED') {
+    if (tabId !== undefined) {
+      tabSpeeds.delete(tabId);
+      removeAllFrames(tabId);
+      if (lastFocusedTabId === tabId) {
+        lastFocusedTabId = null;
+      }
+    }
+    return;
+  }
+
   if (message.type === 'FRAME_STATUS') {
     if (tabId !== undefined) {
       updateFrameInfo(tabId, frameId, {
@@ -292,7 +311,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'POPUP_GET_STATE') {
-    const targetTabId = Number(message.tabId);
+    let targetTabId = Number(message.tabId);
+    if (!Number.isFinite(targetTabId)) {
+      targetTabId = lastFocusedTabId;
+    }
     if (!Number.isFinite(targetTabId)) {
       sendResponse(null);
       return;
@@ -301,7 +323,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     dispatchMessageToFrames(targetTabId, { type: 'GET_STATE' })
       .then(({ response }) => {
         if (response) {
-          sendResponse(response);
+          sendResponse({ ...response, tabId: targetTabId });
           return;
         }
 
@@ -310,6 +332,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           for (const info of registry.values()) {
             if (info.lastSpeed !== undefined) {
               sendResponse({
+                tabId: targetTabId,
                 speed: info.lastSpeed,
                 enforce: settingsCache.applyOnLoad,
                 settings: { ...settingsCache },
@@ -324,6 +347,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const stored = tabSpeeds.get(targetTabId);
         if (typeof stored === 'number') {
           sendResponse({
+            tabId: targetTabId,
             speed: stored,
             enforce: settingsCache.applyOnLoad,
             settings: { ...settingsCache },
@@ -334,6 +358,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         sendResponse({
+          tabId: targetTabId,
           speed: settingsCache.defaultSpeed,
           enforce: settingsCache.applyOnLoad,
           settings: { ...settingsCache },
@@ -342,10 +367,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       })
       .catch(() => sendResponse(null));
-
     return true;
   }
-
   if (message.type === 'POPUP_SET_SPEED') {
     const targetTabId = Number(message.tabId);
     if (!Number.isFinite(targetTabId)) {
@@ -392,32 +415,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  tabSpeeds.delete(tabId);
-  removeAllFrames(tabId);
-});
-
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
-  if (changeInfo.status === 'loading') {
-    removeAllFrames(tabId);
-    tabSpeeds.delete(tabId);
-    return;
-  }
-  if (changeInfo.status !== 'complete') {
-    return;
-  }
-  const storedSpeed = tabSpeeds.get(tabId);
-  if (typeof storedSpeed === 'number') {
-    await setSpeed(tabId, storedSpeed, { skipTracking: true });
-    return;
-  }
-  if (settingsCache.applyOnLoad) {
-    await setSpeed(tabId, settingsCache.defaultSpeed, {
-      skipTracking: !settingsCache.rememberLastSpeed,
-      requirePlaying: false
-    });
-  }
-});
-
 
