@@ -229,6 +229,28 @@ function handleRuntimeMessage(message, sender) {
     return;
   }
 
+  if (message.type === 'TAB_FOCUSED') {
+    if (sender && sender.tab && Number.isFinite(sender.tab.id)) {
+      activeTabId = sender.tab.id;
+      // Refresh current state promptly for the focused tab
+      sendCommandToBackground('POPUP_GET_STATE', {})
+        .then((response) => {
+          if (!response) return;
+          if (Number.isFinite(response.tabId)) {
+            activeTabId = response.tabId;
+          }
+          renderSpeed(Number(response.speed) || settings.defaultSpeed);
+          if (!response.hasPlaying) {
+            showStatus(strings.status.playPrompt, 'info');
+          } else {
+            showStatus('');
+          }
+        })
+        .catch(() => {});
+    }
+    return;
+  }
+
   if (message.type === 'FRAME_STATUS') {
     if (activeTabId === null && Number.isFinite(message.tabId)) {
       activeTabId = message.tabId;
