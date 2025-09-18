@@ -193,20 +193,46 @@ function sendCommandToBackground(type, payload) {
   });
 }
 
-function handleRuntimeMessage(message) {
+function handleRuntimeMessage(message, sender) {
   if (!message || typeof message !== 'object') return;
 
-  if (message.type === 'SPEED_UPDATE' && message.tabId === activeTabId) {
-    renderSpeed(Number(message.speed) || settings.defaultSpeed);
-    if (message.applied) {
-      showStatus(strings.status.updated, 'success');
+  const incomingTabId = sender && sender.tab && sender.tab.id;
+
+  // Fast path: accept direct content-script notifications
+  if (message.type === 'CONTENT_SPEED_CHANGE') {
+    if (Number.isFinite(incomingTabId)) {
+      if (activeTabId === null) {
+        activeTabId = incomingTabId;
+      }
+      if (activeTabId === incomingTabId) {
+        renderSpeed(Number(message.speed) || settings.defaultSpeed);
+        if (message.applied) {
+          showStatus(strings.status.updated, 'success');
+        } else {
+          showStatus(strings.status.playPrompt, 'info');
+        }
+      }
     }
     return;
   }
 
-  if (activeTabId === null) return;
+  if (message.type === 'SPEED_UPDATE') {
+    if (activeTabId === null && Number.isFinite(message.tabId)) {
+      activeTabId = message.tabId;
+    }
+    if (message.tabId === activeTabId) {
+      renderSpeed(Number(message.speed) || settings.defaultSpeed);
+      if (message.applied) {
+        showStatus(strings.status.updated, 'success');
+      }
+    }
+    return;
+  }
 
   if (message.type === 'FRAME_STATUS') {
+    if (activeTabId === null && Number.isFinite(message.tabId)) {
+      activeTabId = message.tabId;
+    }
     if (message.tabId !== undefined && message.tabId !== activeTabId) {
       return;
     }
@@ -218,6 +244,7 @@ function handleRuntimeMessage(message) {
     } else {
       showStatus('');
     }
+    return;
   }
 }
 
