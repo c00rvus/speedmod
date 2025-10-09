@@ -5,7 +5,10 @@
   maxSpeed: 4,
   applyOnLoad: true,
   rememberLastSpeed: true,
-  language: 'en'
+  language: 'en',
+  decreaseKey: 'a',
+  resetKey: 's',
+  increaseKey: 'd'
 };
 
 const TRANSLATIONS = {
@@ -26,6 +29,42 @@ const mediaCleanup = new Map();
 const observedRoots = new Set();
 let overlayElement = null;
 let overlayTimer = null;
+
+function getFullscreenElement() {
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement ||
+    null
+  );
+}
+
+function getOverlayHost() {
+  const fullscreenElement = getFullscreenElement();
+  if (fullscreenElement && fullscreenElement instanceof Element) {
+    return fullscreenElement;
+  }
+  return document.documentElement;
+}
+
+function mountOverlay() {
+  if (!overlayElement) {
+    return;
+  }
+  const host = getOverlayHost();
+  if (overlayElement.parentNode !== host) {
+    overlayElement.remove();
+    host.appendChild(overlayElement);
+  }
+}
+
+function handleFullscreenChange() {
+  if (!overlayElement) {
+    return;
+  }
+  mountOverlay();
+}
 
 function clampSpeed(value) {
   const min = Number(settings.minSpeed) || DEFAULT_SETTINGS.minSpeed;
@@ -396,8 +435,8 @@ function ensureOverlay() {
   if (!overlayElement) {
     overlayElement = document.createElement('div');
     overlayElement.className = 'media-speed-overlay';
-    document.documentElement.appendChild(overlayElement);
   }
+  mountOverlay();
   if (!document.getElementById('media-speed-style')) {
     const style = document.createElement('style');
     style.id = 'media-speed-style';
@@ -470,22 +509,25 @@ function handleKeyboard(event) {
     return;
   }
 
-  const key = String(event.key).toLowerCase();
+  const key = String(event.key || '').toLowerCase();
+  const decreaseKey = String(settings.decreaseKey || DEFAULT_SETTINGS.decreaseKey).toLowerCase();
+  const increaseKey = String(settings.increaseKey || DEFAULT_SETTINGS.increaseKey).toLowerCase();
+  const resetKey = String(settings.resetKey || DEFAULT_SETTINGS.resetKey).toLowerCase();
   let result = null;
 
-  if (key === 'a') {
+  if (key === decreaseKey) {
     result = setCurrentSpeed(currentSpeed - settings.speedStep, {
       forceEnforce: true,
       requirePlaying: true,
       notifyBackground: true
     });
-  } else if (key === 'd') {
+  } else if (key === increaseKey) {
     result = setCurrentSpeed(currentSpeed + settings.speedStep, {
       forceEnforce: true,
       requirePlaying: true,
       notifyBackground: true
     });
-  } else if (key === 's') {
+  } else if (key === resetKey) {
     result = setCurrentSpeed(settings.defaultSpeed, {
       forceEnforce: true,
       requirePlaying: true,
@@ -512,6 +554,8 @@ function init() {
   loadSettings();
   notifyFrameStatus();
   window.addEventListener('keydown', handleKeyboard, true);
+  document.addEventListener('fullscreenchange', handleFullscreenChange, true);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange, true);
 
   // Inform the background which tab is active without needing the
   // tabs permission. Send when visible now and on visibility changes.

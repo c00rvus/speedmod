@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "speedmod",
   "description": "Ajuste a velocidade de videos e audios com atalhos simples enquanto a reprodução acontece.",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "permissions": [
     "storage"
   ],

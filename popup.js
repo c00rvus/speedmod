@@ -5,7 +5,10 @@
   maxSpeed: 4,
   applyOnLoad: true,
   rememberLastSpeed: true,
-  language: 'en'
+  language: 'en',
+  decreaseKey: 'a',
+  resetKey: 's',
+  increaseKey: 'd'
 };
 
 const TRANSLATIONS = {
@@ -17,12 +20,24 @@ const TRANSLATIONS = {
       openOptions: 'Settings',
       openOptionsTitle: 'Open settings',
       speedCaption: 'Current tab speed',
-      badge: 'Keys A · S · D',
-      decreaseTitle: 'Decrease speed',
-      increaseTitle: 'Increase speed',
-      resetTitle: 'Restore default speed',
-      resetButton: 'Default (S)',
-      hint: 'Start playback to change the speed. Use A, S and D directly on the video.',
+      badge(keys) {
+        return `Keys ${keys.decrease} · ${keys.reset} · ${keys.increase}`;
+      },
+      decreaseTitle(keys) {
+        return `Decrease speed (${keys.decrease})`;
+      },
+      increaseTitle(keys) {
+        return `Increase speed (${keys.increase})`;
+      },
+      resetTitle(keys) {
+        return `Restore default speed (${keys.reset})`;
+      },
+      resetButton(keys) {
+        return `Default (${keys.reset})`;
+      },
+      hint(keys) {
+        return `Start playback to change the speed. Use ${keys.decrease}, ${keys.reset} and ${keys.increase} directly on the video.`;
+      },
       sliderLabel: 'Speed'
     },
     status: {
@@ -41,12 +56,24 @@ const TRANSLATIONS = {
       openOptions: 'Config',
       openOptionsTitle: 'Abrir configurações',
       speedCaption: 'Velocidade atual da aba',
-      badge: 'Teclas A · S · D',
-      decreaseTitle: 'Diminuir velocidade',
-      increaseTitle: 'Aumentar velocidade',
-      resetTitle: 'Restaurar velocidade padrão',
-      resetButton: 'Padrão (S)',
-      hint: 'Inicie a reprodução para alterar a velocidade. Use A, S e D diretamente no vídeo.',
+      badge(keys) {
+        return `Teclas ${keys.decrease} · ${keys.reset} · ${keys.increase}`;
+      },
+      decreaseTitle(keys) {
+        return `Diminuir velocidade (${keys.decrease})`;
+      },
+      increaseTitle(keys) {
+        return `Aumentar velocidade (${keys.increase})`;
+      },
+      resetTitle(keys) {
+        return `Restaurar velocidade padrão (${keys.reset})`;
+      },
+      resetButton(keys) {
+        return `Padrão (${keys.reset})`;
+      },
+      hint(keys) {
+        return `Inicie a reprodução para alterar a velocidade. Use ${keys.decrease}, ${keys.reset} e ${keys.increase} diretamente no vídeo.`;
+      },
       sliderLabel: 'Velocidade'
     },
     status: {
@@ -72,6 +99,8 @@ const titleHeading = document.querySelector('.title h1');
 const subtitleText = document.querySelector('.title p');
 const speedCaption = document.querySelector('.speed-caption');
 const badgeText = document.querySelector('.badge');
+const decreaseKeyHint = decreaseBtn.querySelector('.key-hint');
+const increaseKeyHint = increaseBtn.querySelector('.key-hint');
 
 let activeTabId = null;
 let settings = { ...DEFAULT_SETTINGS };
@@ -109,14 +138,91 @@ function applyTranslations(language) {
   openOptionsBtn.textContent = strings.ui.openOptions;
   openOptionsBtn.title = strings.ui.openOptionsTitle;
   speedCaption.textContent = strings.ui.speedCaption;
-  badgeText.textContent = strings.ui.badge;
-  decreaseBtn.title = strings.ui.decreaseTitle;
-  increaseBtn.title = strings.ui.increaseTitle;
-  resetBtn.title = strings.ui.resetTitle;
-  resetBtn.textContent = strings.ui.resetButton;
-  hintParagraph.textContent = strings.ui.hint;
   slider.setAttribute('aria-label', strings.ui.sliderLabel);
   numberInput.setAttribute('aria-label', strings.ui.sliderLabel);
+  updateShortcutAnnotations();
+}
+function formatShortcutLabel(value, fallback) {
+  const raw = String(value ?? '').trim();
+  if (raw) {
+    return raw.charAt(0).toUpperCase();
+  }
+  const fallbackRaw = String(fallback ?? '').trim();
+  return fallbackRaw ? fallbackRaw.charAt(0).toUpperCase() : '';
+}
+
+function getShortcutLabels() {
+  return {
+    decrease: formatShortcutLabel(settings.decreaseKey, DEFAULT_SETTINGS.decreaseKey),
+    reset: formatShortcutLabel(settings.resetKey, DEFAULT_SETTINGS.resetKey),
+    increase: formatShortcutLabel(settings.increaseKey, DEFAULT_SETTINGS.increaseKey)
+  };
+}
+
+function resolveShortcutTemplate(template, keys) {
+  if (typeof template === 'function') {
+    return template(keys);
+  }
+  return template;
+}
+
+function updateShortcutAnnotations() {
+  if (!strings || !strings.ui) {
+    return;
+  }
+  const keys = getShortcutLabels();
+  const badgeValue = resolveShortcutTemplate(strings.ui.badge, keys);
+  if (badgeValue !== undefined && badgeText) {
+    badgeText.textContent = badgeValue;
+  }
+  const decreaseTitle = resolveShortcutTemplate(strings.ui.decreaseTitle, keys);
+  if (decreaseTitle !== undefined) {
+    decreaseBtn.title = decreaseTitle;
+  }
+  const increaseTitle = resolveShortcutTemplate(strings.ui.increaseTitle, keys);
+  if (increaseTitle !== undefined) {
+    increaseBtn.title = increaseTitle;
+  }
+  const resetTitle = resolveShortcutTemplate(strings.ui.resetTitle, keys);
+  if (resetTitle !== undefined) {
+    resetBtn.title = resetTitle;
+  }
+  const resetButtonLabel = resolveShortcutTemplate(strings.ui.resetButton, keys);
+  if (resetButtonLabel !== undefined) {
+    resetBtn.textContent = resetButtonLabel;
+  }
+  const hintLabel = resolveShortcutTemplate(strings.ui.hint, keys);
+  if (hintLabel !== undefined && hintParagraph) {
+    hintParagraph.textContent = hintLabel;
+  }
+  if (decreaseKeyHint) {
+    decreaseKeyHint.textContent = keys.decrease;
+  }
+  if (increaseKeyHint) {
+    increaseKeyHint.textContent = keys.increase;
+  }
+}
+
+function applyStatePayload(state) {
+  if (!state) {
+    return false;
+  }
+  if (Number.isFinite(state.tabId)) {
+    activeTabId = state.tabId;
+  }
+  const incomingSettings = (state.settings && typeof state.settings === 'object') ? state.settings : {};
+  settings = { ...DEFAULT_SETTINGS, ...incomingSettings };
+  applyTranslations(settings.language || DEFAULT_SETTINGS.language);
+  updateBounds(settings);
+  const numericSpeed = Number(state.speed);
+  renderSpeed(Number.isFinite(numericSpeed) ? numericSpeed : settings.defaultSpeed);
+  setControlsDisabled(false);
+  if (!state.hasPlaying) {
+    showStatus(strings.status.playPrompt, 'info');
+  } else {
+    showStatus('');
+  }
+  return true;
 }
 
 function formatSpeed(value) {
@@ -232,22 +338,14 @@ function handleRuntimeMessage(message, sender) {
   if (message.type === 'TAB_FOCUSED') {
     if (sender && sender.tab && Number.isFinite(sender.tab.id)) {
       activeTabId = sender.tab.id;
-      // Refresh current state promptly for the focused tab
-      sendCommandToBackground('POPUP_GET_STATE', {})
-        .then((response) => {
-          if (!response) return;
-          if (Number.isFinite(response.tabId)) {
-            activeTabId = response.tabId;
-          }
-          renderSpeed(Number(response.speed) || settings.defaultSpeed);
-          if (!response.hasPlaying) {
-            showStatus(strings.status.playPrompt, 'info');
-          } else {
-            showStatus('');
-          }
-        })
-        .catch(() => {});
     }
+    sendCommandToBackground('POPUP_GET_STATE', {})
+      .then((response) => {
+        if (!applyStatePayload(response) && strings.status.tabUnavailable) {
+          showStatus(strings.status.tabUnavailable, 'error');
+        }
+      })
+      .catch(() => {});
     return;
   }
 
@@ -298,41 +396,15 @@ async function setSpeed(speed) {
 async function bootstrap() {
   // 1) Try cached state for instant paint
   const cached = await sendCommandToBackground('POPUP_GET_CACHED_STATE', {});
-  if (cached) {
-    if (Number.isFinite(cached.tabId)) {
-      activeTabId = cached.tabId;
-    }
-    settings = { ...DEFAULT_SETTINGS, ...cached.settings };
-    applyTranslations(settings.language || 'en');
-    updateBounds(settings);
-    renderSpeed(Number(cached.speed) || settings.defaultSpeed);
-    setControlsDisabled(false);
-    if (!cached.hasPlaying) {
-      showStatus(strings.status.playPrompt, 'info');
-    } else {
-      showStatus('');
-    }
-  }
+  const cachedApplied = applyStatePayload(cached);
 
   // 2) Fetch authoritative state from content script
   const response = await sendCommandToBackground('POPUP_GET_STATE', {});
-  if (response) {
-    const maybeTabId = Number(response.tabId);
-    activeTabId = Number.isFinite(maybeTabId) ? maybeTabId : activeTabId;
-    settings = { ...DEFAULT_SETTINGS, ...response.settings };
-    applyTranslations(settings.language || 'en');
-    updateBounds(settings);
-    renderSpeed(Number(response.speed) || settings.defaultSpeed);
-    setControlsDisabled(false);
-    if (!response.hasPlaying) {
-      showStatus(strings.status.playPrompt, 'info');
-    } else {
-      showStatus('');
-    }
+  if (applyStatePayload(response)) {
     return;
   }
 
-  if (!cached) {
+  if (!cachedApplied) {
     setControlsDisabled(true);
     showStatus(strings.status.siteUnsupported, 'error');
   }
@@ -340,6 +412,13 @@ async function bootstrap() {
 
 applyTranslations(DEFAULT_SETTINGS.language);
 bootstrap();
+
+
+
+
+
+
+
 
 
 

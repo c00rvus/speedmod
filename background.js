@@ -5,7 +5,10 @@
   maxSpeed: 4,
   applyOnLoad: true,
   rememberLastSpeed: true,
-  language: 'en'
+  language: 'en',
+  decreaseKey: 'a',
+  resetKey: 's',
+  increaseKey: 'd'
 };
 
 const tabSpeeds = new Map();

@@ -51,6 +51,25 @@
         </label>
       </section>
 
+      <section>
+        <h2 id="shortcutsHeading">Shortcut keys</h2>
+        <p class="shortcut-hint" id="shortcutHint">Click a field and press the key you want. Press Backspace to clear.</p>
+        <div class="shortcut-grid">
+          <label class="field" id="labelDecreaseKey">
+            <span>Decrease speed key</span>
+            <input type="text" id="decreaseKey" class="shortcut-input" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <label class="field" id="labelResetKey">
+            <span>Default speed key</span>
+            <input type="text" id="resetKey" class="shortcut-input" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <label class="field" id="labelIncreaseKey">
+            <span>Increase speed key</span>
+            <input type="text" id="increaseKey" class="shortcut-input" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </label>
+        </div>
+      </section>
+
       <div class="actions">
         <button type="submit" id="saveButton">Save</button>
         <button type="button" id="restoreDefaults">Restore defaults</button>
