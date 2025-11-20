@@ -8,7 +8,8 @@
   language: 'en',
   decreaseKey: 'a',
   resetKey: 's',
-  increaseKey: 'd'
+  increaseKey: 'd',
+  disabledSites: []
 };
 
 const TRANSLATIONS = {
@@ -33,19 +34,21 @@ const TRANSLATIONS = {
         return `Restore default speed (${keys.reset})`;
       },
       resetButton(keys) {
-        return `Default (${keys.reset})`;
+        return `Default`;
       },
       hint(keys) {
         return `Start playback to change the speed. Use ${keys.decrease}, ${keys.reset} and ${keys.increase} directly on the video.`;
       },
-      sliderLabel: 'Speed'
+      sliderLabel: 'Speed',
+      toggleLabel: 'Enable on this site'
     },
     status: {
       updated: 'Speed updated.',
       error: 'Could not apply the speed.',
       playPrompt: 'Start playback to change the speed.',
       tabUnavailable: 'Active tab unavailable.',
-      siteUnsupported: 'This site does not allow speed control.'
+      siteUnsupported: 'This site does not allow speed control.',
+      disabled: 'Speed control disabled for this site.'
     }
   },
   'pt-BR': {
@@ -69,19 +72,21 @@ const TRANSLATIONS = {
         return `Restaurar velocidade padrão (${keys.reset})`;
       },
       resetButton(keys) {
-        return `Padrão (${keys.reset})`;
+        return `Padrão`;
       },
       hint(keys) {
         return `Inicie a reprodução para alterar a velocidade. Use ${keys.decrease}, ${keys.reset} e ${keys.increase} diretamente no vídeo.`;
       },
-      sliderLabel: 'Velocidade'
+      sliderLabel: 'Velocidade',
+      toggleLabel: 'Ativar neste site'
     },
     status: {
       updated: 'Velocidade atualizada.',
       error: 'Não foi possível aplicar a velocidade.',
       playPrompt: 'Reproduza o vídeo para alterar a velocidade.',
       tabUnavailable: 'Aba ativa indisponível.',
-      siteUnsupported: 'Este site não permite controlar a velocidade.'
+      siteUnsupported: 'Este site não permite controlar a velocidade.',
+      disabled: 'Controle desativado para este site.'
     }
   }
 };
@@ -101,8 +106,11 @@ const speedCaption = document.querySelector('.speed-caption');
 const badgeText = document.querySelector('.badge');
 const decreaseKeyHint = decreaseBtn.querySelector('.key-hint');
 const increaseKeyHint = increaseBtn.querySelector('.key-hint');
+const siteToggle = document.getElementById('siteToggle');
+const siteToggleLabel = document.getElementById('siteToggleLabel');
 
 let activeTabId = null;
+let currentHostname = '';
 let settings = { ...DEFAULT_SETTINGS };
 let isUpdatingUI = false;
 let strings = TRANSLATIONS.en;
@@ -129,6 +137,54 @@ numberInput.addEventListener('change', () => {
   setSpeed(Number(numberInput.value));
 });
 
+siteToggle.addEventListener('change', async () => {
+  if (!currentHostname) return;
+
+  // Fetch latest from storage to be safe
+  const items = await new Promise(resolve => chrome.storage.sync.get({ disabledSites: [] }, resolve));
+  const disabledSites = items.disabledSites || [];
+  const isEnabled = siteToggle.checked;
+
+  let newDisabledSites;
+  if (isEnabled) {
+    newDisabledSites = disabledSites.filter(site => site !== currentHostname);
+  } else {
+    if (!disabledSites.includes(currentHostname)) {
+      newDisabledSites = [...disabledSites, currentHostname];
+    } else {
+      newDisabledSites = disabledSites;
+    }
+  }
+
+  // Update local settings immediately for UI responsiveness
+  settings.disabledSites = newDisabledSites;
+
+  // Save to storage
+  await new Promise(resolve => {
+    chrome.storage.sync.set({ disabledSites: newDisabledSites }, resolve);
+  });
+
+  // Notify content script
+  if (activeTabId) {
+    await sendCommandToBackground('POPUP_TOGGLE_SITE', {
+      tabId: activeTabId,
+      hostname: currentHostname,
+      enabled: isEnabled
+    });
+  }
+
+  updateUIState(isEnabled);
+});
+
+function updateUIState(isEnabled) {
+  setControlsDisabled(!isEnabled);
+  if (!isEnabled) {
+    showStatus(strings.status.disabled, 'info');
+  } else {
+    showStatus('');
+  }
+}
+
 function applyTranslations(language) {
   strings = TRANSLATIONS[language] || TRANSLATIONS.en;
   document.documentElement.lang = language;
@@ -140,6 +196,7 @@ function applyTranslations(language) {
   speedCaption.textContent = strings.ui.speedCaption;
   slider.setAttribute('aria-label', strings.ui.sliderLabel);
   numberInput.setAttribute('aria-label', strings.ui.sliderLabel);
+  siteToggleLabel.textContent = strings.ui.toggleLabel;
   updateShortcutAnnotations();
 }
 function formatShortcutLabel(value, fallback) {
@@ -210,18 +267,36 @@ function applyStatePayload(state) {
   if (Number.isFinite(state.tabId)) {
     activeTabId = state.tabId;
   }
+  if (state.hostname) {
+    currentHostname = state.hostname;
+    siteToggle.disabled = false;
+  } else {
+    siteToggle.disabled = true;
+  }
+
   const incomingSettings = (state.settings && typeof state.settings === 'object') ? state.settings : {};
   settings = { ...DEFAULT_SETTINGS, ...incomingSettings };
   applyTranslations(settings.language || DEFAULT_SETTINGS.language);
   updateBounds(settings);
+
+  // Check if site is disabled
+  const disabledSites = settings.disabledSites || [];
+  const isEnabled = !disabledSites.includes(currentHostname);
+  siteToggle.checked = isEnabled;
+
   const numericSpeed = Number(state.speed);
   renderSpeed(Number.isFinite(numericSpeed) ? numericSpeed : settings.defaultSpeed);
-  setControlsDisabled(false);
-  if (!state.hasPlaying) {
-    showStatus(strings.status.playPrompt, 'info');
-  } else {
-    showStatus('');
+
+  updateUIState(isEnabled);
+
+  if (isEnabled) {
+    if (!state.hasPlaying) {
+      showStatus(strings.status.playPrompt, 'info');
+    } else {
+      showStatus('');
+    }
   }
+
   return true;
 }
 
@@ -345,7 +420,7 @@ function handleRuntimeMessage(message, sender) {
           showStatus(strings.status.tabUnavailable, 'error');
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return;
   }
 
@@ -359,10 +434,18 @@ function handleRuntimeMessage(message, sender) {
     if (typeof message.speed === 'number') {
       renderSpeed(message.speed);
     }
-    if (!message.hasPlaying) {
-      showStatus(strings.status.playPrompt, 'info');
-    } else {
-      showStatus('');
+
+    // Check disabled state if passed, or infer?
+    // Ideally FRAME_STATUS should include enabled state or we check settings
+    const disabledSites = settings.disabledSites || [];
+    const isEnabled = !disabledSites.includes(currentHostname);
+
+    if (isEnabled) {
+      if (!message.hasPlaying) {
+        showStatus(strings.status.playPrompt, 'info');
+      } else {
+        showStatus('');
+      }
     }
     return;
   }

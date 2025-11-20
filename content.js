@@ -8,7 +8,8 @@
   language: 'en',
   decreaseKey: 'a',
   resetKey: 's',
-  increaseKey: 'd'
+  increaseKey: 'd',
+  disabledSites: []
 };
 
 const TRANSLATIONS = {
@@ -113,17 +114,28 @@ function notifyFrameStatus(overrides = {}) {
     hasMedia,
     hasPlaying,
     speed: currentSpeed,
+    hostname: window.location.hostname,
     ...overrides
   });
 }
 
 function applySpeedToMedia(media) {
+  if (checkDisabledState()) {
+    return;
+  }
   if (media instanceof HTMLMediaElement) {
     media.playbackRate = currentSpeed;
   }
 }
 
 function setCurrentSpeed(value, options = {}) {
+  if (checkDisabledState()) {
+    // If disabled, we can update currentSpeed but not apply it
+    const target = clampSpeed(value);
+    currentSpeed = target;
+    return { speed: currentSpeed, applied: false };
+  }
+
   const { forceEnforce = false, requirePlaying = false, notifyBackground = false } = options;
   const target = clampSpeed(value);
   currentSpeed = target;
@@ -143,7 +155,8 @@ function setCurrentSpeed(value, options = {}) {
     safeSendMessage({
       type: 'CONTENT_SPEED_CHANGE',
       speed: currentSpeed,
-      applied
+      applied,
+      hostname: window.location.hostname
     });
   }
 
@@ -167,6 +180,7 @@ function cleanupMedia(media) {
 
 function attachMediaListeners(media) {
   const enforce = () => {
+    if (checkDisabledState()) return;
     if (shouldEnforce && !media.paused && !media.ended) {
       applySpeedToMedia(media);
     }
@@ -190,6 +204,7 @@ function attachMediaListeners(media) {
     ['abort', remove],
     ['error', remove],
     ['ratechange', () => {
+      if (checkDisabledState()) return;
       if (Math.abs(media.playbackRate - currentSpeed) > 0.001 && shouldEnforce && !media.paused && !media.ended) {
         media.playbackRate = currentSpeed;
       }
@@ -335,6 +350,11 @@ function loadSettings() {
     settings = { ...DEFAULT_SETTINGS, ...items };
     setLanguage(settings.language || 'en');
     shouldEnforce = Boolean(settings.applyOnLoad);
+
+    if (checkDisabledState()) {
+      return;
+    }
+
     setCurrentSpeed(settings.defaultSpeed, {
       forceEnforce: shouldEnforce,
       requirePlaying: false,
@@ -360,8 +380,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (key === 'language') {
       setLanguage(change.newValue);
     }
+    if (key === 'disabledSites') {
+      if (checkDisabledState()) {
+        // If now disabled, stop here
+      } else {
+        // If now enabled (was disabled), re-apply speed
+        setCurrentSpeed(currentSpeed, { forceEnforce: true });
+      }
+    }
   }
-  if (defaultUpdated) {
+  if (defaultUpdated && !checkDisabledState()) {
     setCurrentSpeed(settings.defaultSpeed, {
       forceEnforce: shouldEnforce,
       requirePlaying: false,
@@ -378,12 +406,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'GET_STATE': {
       const playing = getPlayingMedia();
+      const disabledSites = settings.disabledSites || [];
+      const isEnabled = !disabledSites.includes(window.location.hostname);
+
       sendResponse({
         speed: currentSpeed,
         enforce: shouldEnforce,
         settings,
         hasPlaying: playing.length > 0,
-        hasMedia: mediaElements.size > 0
+        hasMedia: mediaElements.size > 0,
+        hostname: window.location.hostname
       });
       notifyFrameStatus({ hasPlaying: playing.length > 0 });
       return true;
@@ -415,6 +447,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.settings && message.settings.language !== undefined) {
         setLanguage(message.settings.language);
       }
+
+      checkDisabledState();
+
       const nextDefault = message.settings && message.settings.defaultSpeed !== undefined
         ? message.settings.defaultSpeed
         : currentSpeed;
@@ -426,10 +461,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse(result);
       return true;
     }
+    case 'TOGGLE_SITE': {
+      // Message from popup via background
+      if (message.hostname === window.location.hostname) {
+        const disabledSites = settings.disabledSites || [];
+        const isEnabled = Boolean(message.enabled);
+
+        if (isEnabled) {
+          // Re-enable: remove from disabled list if present (though settings should be updated via storage too)
+          settings.disabledSites = disabledSites.filter(s => s !== window.location.hostname);
+          shouldEnforce = settings.applyOnLoad; // Restore enforcement preference
+          setCurrentSpeed(currentSpeed, { forceEnforce: true });
+        } else {
+          // Disable
+          if (!disabledSites.includes(window.location.hostname)) {
+            settings.disabledSites = [...disabledSites, window.location.hostname];
+          }
+          disableSpeedControl();
+        }
+      }
+      sendResponse({ success: true });
+      return true;
+    }
     default:
       return false;
   }
 });
+
+function checkDisabledState() {
+  const disabledSites = settings.disabledSites || [];
+  if (disabledSites.includes(window.location.hostname)) {
+    disableSpeedControl();
+    return true;
+  }
+  return false;
+}
+
+function disableSpeedControl() {
+  // Reset media to 1.0x
+  mediaElements.forEach(media => {
+    media.playbackRate = 1.0;
+  });
+  // We don't change currentSpeed variable so that if re-enabled it goes back to what it was?
+  // Or should we? The request says "pause control", usually implies reverting to normal.
+  // But if I re-enable, I probably want the speed back.
+  // For now, let's just stop enforcing.
+}
 
 function ensureOverlay() {
   if (!overlayElement) {
@@ -499,6 +576,9 @@ function isEditableTarget(target) {
 }
 
 function handleKeyboard(event) {
+  if (checkDisabledState()) {
+    return;
+  }
   if (event.defaultPrevented || event.repeat) {
     return;
   }

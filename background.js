@@ -8,7 +8,8 @@
   language: 'en',
   decreaseKey: 'a',
   resetKey: 's',
-  increaseKey: 'd'
+  increaseKey: 'd',
+  disabledSites: []
 };
 
 const tabSpeeds = new Map();
@@ -306,7 +307,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 setBadge(tabId, response.speed, Boolean(response.hasPlaying));
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
     }
@@ -330,7 +331,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       updateFrameInfo(tabId, frameId, {
         hasMedia: Boolean(message.hasMedia),
         hasPlaying: Boolean(message.hasPlaying),
-        lastSpeed: typeof message.speed === 'number' ? message.speed : undefined
+        lastSpeed: typeof message.speed === 'number' ? message.speed : undefined,
+        hostname: message.hostname
       });
       if (typeof message.speed === 'number') {
         setBadge(tabId, message.speed, Boolean(message.hasPlaying));
@@ -341,7 +343,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         frameId,
         hasMedia: Boolean(message.hasMedia),
         hasPlaying: Boolean(message.hasPlaying),
-        speed: typeof message.speed === 'number' ? message.speed : undefined
+        speed: typeof message.speed === 'number' ? message.speed : undefined,
+        hostname: message.hostname
       });
     }
     return;
@@ -361,7 +364,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       updateFrameInfo(tabId, frameId, {
         hasMedia: true,
         hasPlaying: Boolean(message.applied),
-        lastSpeed: message.speed
+        lastSpeed: message.speed,
+        hostname: message.hostname
       });
       setBadge(tabId, message.speed, Boolean(message.applied));
       broadcast({
@@ -369,7 +373,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         tabId,
         frameId,
         speed: message.speed,
-        applied: message.applied
+        applied: message.applied,
+        hostname: message.hostname
       });
     }
     return;
@@ -395,7 +400,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             enforce: settingsCache.applyOnLoad,
             settings: { ...settingsCache },
             hasPlaying: Boolean(info.hasPlaying),
-            hasMedia: Boolean(info.hasMedia)
+            hasMedia: Boolean(info.hasMedia),
+            hostname: info.hostname
           });
           return;
         }
@@ -410,7 +416,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         enforce: settingsCache.applyOnLoad,
         settings: { ...settingsCache },
         hasPlaying: false,
-        hasMedia: Boolean(registry && registry.size > 0)
+        hasMedia: Boolean(registry && registry.size > 0),
+        hostname: registry && registry.get(0) && registry.get(0).hostname
       });
       return;
     }
@@ -528,6 +535,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(response || null);
       })
       .catch(() => sendResponse(null));
+    return true;
+  }
+
+  if (message.type === 'POPUP_TOGGLE_SITE') {
+    const targetTabId = Number(message.tabId);
+    if (!Number.isFinite(targetTabId)) {
+      sendResponse(null);
+      return;
+    }
+
+    dispatchMessageToFrames(targetTabId, {
+      type: 'TOGGLE_SITE',
+      hostname: message.hostname,
+      enabled: message.enabled
+    }).then(() => {
+      sendResponse({ success: true });
+    });
+
     return true;
   }
 });
