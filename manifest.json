@@ -1,13 +1,8 @@
 ﻿{
   "manifest_version": 3,
   "name": "speedmod",
-<<<<<<< HEAD
-  "description": "Adjust video and audio speed with simple shortcuts during playback.",
-  "version": "1.3.0",
-=======
   "description": "Ajuste a velocidade de videos e audios com atalhos simples enquanto a reprodução acontece.",
   "version": "1.1.2",
->>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
   "permissions": [
     "storage"
   ],
