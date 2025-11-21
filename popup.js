@@ -5,11 +5,15 @@
   maxSpeed: 4,
   applyOnLoad: true,
   rememberLastSpeed: true,
+<<<<<<< HEAD
   language: 'en',
   decreaseKey: 'a',
   resetKey: 's',
   increaseKey: 'd',
   disabledSites: []
+=======
+  language: 'en'
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
 };
 
 const TRANSLATIONS = {
@@ -21,6 +25,7 @@ const TRANSLATIONS = {
       openOptions: 'Settings',
       openOptionsTitle: 'Open settings',
       speedCaption: 'Current tab speed',
+<<<<<<< HEAD
       badge(keys) {
         return `Keys ${keys.decrease} · ${keys.reset} · ${keys.increase}`;
       },
@@ -41,6 +46,15 @@ const TRANSLATIONS = {
       },
       sliderLabel: 'Speed',
       toggleLabel: 'Enable on this site'
+=======
+      badge: 'Keys A · S · D',
+      decreaseTitle: 'Decrease speed',
+      increaseTitle: 'Increase speed',
+      resetTitle: 'Restore default speed',
+      resetButton: 'Default (S)',
+      hint: 'Start playback to change the speed. Use A, S and D directly on the video.',
+      sliderLabel: 'Speed'
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
     },
     status: {
       updated: 'Speed updated.',
@@ -59,6 +73,7 @@ const TRANSLATIONS = {
       openOptions: 'Config',
       openOptionsTitle: 'Abrir configurações',
       speedCaption: 'Velocidade atual da aba',
+<<<<<<< HEAD
       badge(keys) {
         return `Teclas ${keys.decrease} · ${keys.reset} · ${keys.increase}`;
       },
@@ -79,6 +94,15 @@ const TRANSLATIONS = {
       },
       sliderLabel: 'Velocidade',
       toggleLabel: 'Ativar neste site'
+=======
+      badge: 'Teclas A · S · D',
+      decreaseTitle: 'Diminuir velocidade',
+      increaseTitle: 'Aumentar velocidade',
+      resetTitle: 'Restaurar velocidade padrão',
+      resetButton: 'Padrão (S)',
+      hint: 'Inicie a reprodução para alterar a velocidade. Use A, S e D diretamente no vídeo.',
+      sliderLabel: 'Velocidade'
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
     },
     status: {
       updated: 'Velocidade atualizada.',
@@ -104,10 +128,13 @@ const titleHeading = document.querySelector('.title h1');
 const subtitleText = document.querySelector('.title p');
 const speedCaption = document.querySelector('.speed-caption');
 const badgeText = document.querySelector('.badge');
+<<<<<<< HEAD
 const decreaseKeyHint = decreaseBtn.querySelector('.key-hint');
 const increaseKeyHint = increaseBtn.querySelector('.key-hint');
 const siteToggle = document.getElementById('siteToggle');
 const siteToggleLabel = document.getElementById('siteToggleLabel');
+=======
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
 
 let activeTabId = null;
 let currentHostname = '';
@@ -194,8 +221,15 @@ function applyTranslations(language) {
   openOptionsBtn.textContent = strings.ui.openOptions;
   openOptionsBtn.title = strings.ui.openOptionsTitle;
   speedCaption.textContent = strings.ui.speedCaption;
+  badgeText.textContent = strings.ui.badge;
+  decreaseBtn.title = strings.ui.decreaseTitle;
+  increaseBtn.title = strings.ui.increaseTitle;
+  resetBtn.title = strings.ui.resetTitle;
+  resetBtn.textContent = strings.ui.resetButton;
+  hintParagraph.textContent = strings.ui.hint;
   slider.setAttribute('aria-label', strings.ui.sliderLabel);
   numberInput.setAttribute('aria-label', strings.ui.sliderLabel);
+<<<<<<< HEAD
   siteToggleLabel.textContent = strings.ui.toggleLabel;
   updateShortcutAnnotations();
 }
@@ -298,6 +332,8 @@ function applyStatePayload(state) {
   }
 
   return true;
+=======
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
 }
 
 function formatSpeed(value) {
@@ -413,7 +449,23 @@ function handleRuntimeMessage(message, sender) {
   if (message.type === 'TAB_FOCUSED') {
     if (sender && sender.tab && Number.isFinite(sender.tab.id)) {
       activeTabId = sender.tab.id;
+      // Refresh current state promptly for the focused tab
+      sendCommandToBackground('POPUP_GET_STATE', {})
+        .then((response) => {
+          if (!response) return;
+          if (Number.isFinite(response.tabId)) {
+            activeTabId = response.tabId;
+          }
+          renderSpeed(Number(response.speed) || settings.defaultSpeed);
+          if (!response.hasPlaying) {
+            showStatus(strings.status.playPrompt, 'info');
+          } else {
+            showStatus('');
+          }
+        })
+        .catch(() => {});
     }
+<<<<<<< HEAD
     sendCommandToBackground('POPUP_GET_STATE', {})
       .then((response) => {
         if (!applyStatePayload(response) && strings.status.tabUnavailable) {
@@ -421,6 +473,8 @@ function handleRuntimeMessage(message, sender) {
         }
       })
       .catch(() => { });
+=======
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
     return;
   }
 
@@ -479,15 +533,41 @@ async function setSpeed(speed) {
 async function bootstrap() {
   // 1) Try cached state for instant paint
   const cached = await sendCommandToBackground('POPUP_GET_CACHED_STATE', {});
-  const cachedApplied = applyStatePayload(cached);
+  if (cached) {
+    if (Number.isFinite(cached.tabId)) {
+      activeTabId = cached.tabId;
+    }
+    settings = { ...DEFAULT_SETTINGS, ...cached.settings };
+    applyTranslations(settings.language || 'en');
+    updateBounds(settings);
+    renderSpeed(Number(cached.speed) || settings.defaultSpeed);
+    setControlsDisabled(false);
+    if (!cached.hasPlaying) {
+      showStatus(strings.status.playPrompt, 'info');
+    } else {
+      showStatus('');
+    }
+  }
 
   // 2) Fetch authoritative state from content script
   const response = await sendCommandToBackground('POPUP_GET_STATE', {});
-  if (applyStatePayload(response)) {
+  if (response) {
+    const maybeTabId = Number(response.tabId);
+    activeTabId = Number.isFinite(maybeTabId) ? maybeTabId : activeTabId;
+    settings = { ...DEFAULT_SETTINGS, ...response.settings };
+    applyTranslations(settings.language || 'en');
+    updateBounds(settings);
+    renderSpeed(Number(response.speed) || settings.defaultSpeed);
+    setControlsDisabled(false);
+    if (!response.hasPlaying) {
+      showStatus(strings.status.playPrompt, 'info');
+    } else {
+      showStatus('');
+    }
     return;
   }
 
-  if (!cachedApplied) {
+  if (!cached) {
     setControlsDisabled(true);
     showStatus(strings.status.siteUnsupported, 'error');
   }
@@ -495,13 +575,6 @@ async function bootstrap() {
 
 applyTranslations(DEFAULT_SETTINGS.language);
 bootstrap();
-
-
-
-
-
-
-
 
 
 

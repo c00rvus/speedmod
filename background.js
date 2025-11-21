@@ -5,11 +5,15 @@
   maxSpeed: 4,
   applyOnLoad: true,
   rememberLastSpeed: true,
+<<<<<<< HEAD
   language: 'en',
   decreaseKey: 'a',
   resetKey: 's',
   increaseKey: 'd',
   disabledSites: []
+=======
+  language: 'en'
+>>>>>>> parent of 8430702 (feat(shortcuts): allow configurable keys and better feedback)
 };
 
 const tabSpeeds = new Map();
